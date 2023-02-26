@@ -1,142 +1,151 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Contoh Penggunaan Bootstrap dengan ExpressJS</title>
-    <link rel="stylesheet" href="/css/bootstrap.min.css" />
-  </head>
 
-  <body>
-    <style>
-      body {
-        background: #1c1c1c;
-      }
-      .form-control:focus {
-        color: #212529;
-        background-color: #fff;
-        outline: 0;
-        box-shadow: unset !important;
-        border-color: unset !important;
-      }
-    </style>
-    <div class="container">
-      <pre id="messages" style="height: 500px; color: white"></pre>
+<head>
+  <title>Contoh Penggunaan Bootstrap dengan ExpressJS</title>
+  <link rel="stylesheet" href="/css/bootstrap.min.css" />
+</head>
 
-      <input
-        placeholder="Type something"
-        id="messageBox"
-        type="text"
-        class="form-control w-100"
-        style="
+<body>
+  <style>
+    body {
+      background: #1c1c1c;
+    }
+
+    .form-control:focus {
+      color: #212529;
+      background-color: #fff;
+      outline: 0;
+      box-shadow: unset !important;
+      border-color: unset !important;
+    }
+  </style>
+  <div class="container">
+    <pre id="messages" style="height: 500px; color: white"></pre>
+
+    <input placeholder="Type something" id="messageBox" type="text" class="form-control w-100" style="
           background: #2e2e2e;
           border: none;
           color: white;
           padding-top: 10px;
           padding-bottom: 10px;
-        "
-      />
-    </div>
+        " />
+  </div>
 
-    <script>
-      (function () {
-        let username;
-        if (!username) {
-          username = prompt("Enter your username");
-        }
+  <script src="/howler/howler.js"></script>
+  <script>
+    (function () {
+      let username;
+      if (!username) {
+        username = prompt("Enter your username");
+      }
 
-        const messages = document.querySelector("#messages");
-        const messagesBox = document.querySelector("#messageBox");
+      const messages = document.querySelector("#messages");
+      const messagesBox = document.querySelector("#messageBox");
 
-        let ws;
-        let isTyping = true;
 
-        function showMessage(message) {
-          if (message.txt == "sedang mengetik...") {
-            if (isTyping) {
-              messages.innerHTML += `<div class="isTyping"><b class="text-${
-                message.username == username ? `success` : `warning`
+      var sound = new Howl({
+        src: ['music/notify.wav']
+      });
+      var typing = new Howl({
+        src: ['music/typing.wav']
+      });
+
+
+      let ws;
+      let isTyping = true;
+
+      function showMessage(message) {
+
+        if (message.txt == "sedang mengetik...") {
+          if (isTyping) {
+            messages.innerHTML += `<div class="isTyping"><b class="text-${message.username == username ? `success` : `warning`
               }">${message.username}</b> <br><b>${message.txt}</b></div>`;
-              isTyping = false;
-            }
-          } else {
-            document.querySelectorAll(".isTyping").forEach((el) => el.remove());
+            isTyping = false;
+            typing.play();
+          }
+        } else {
+          document.querySelectorAll(".isTyping").forEach((el) => el.remove());
 
-            isTyping = true;
+          isTyping = true;
 
-            messages.innerHTML += `<br><b class="text-${
-              message.username == username ? `success` : `warning`
+          messages.innerHTML += `<br><b class="text-${message.username == username ? `success` : `warning`
             }">${message.username}</b>`;
-            messages.innerHTML += `<br><b>${message.txt}</b>`;
-            messagesBox.value = "";
-            messages.scrollTop = messagesBox.scrollTop;
-          }
+          messages.innerHTML += `<br><b>${message.txt}</b>`;
+          messagesBox.value = "";
+          messages.scrollTop = messagesBox.scrollTop;
+          sound.play();
+        }
+      }
+
+      function init() {
+        if (ws) {
+          ws.onerror = ws.onopen = ws.onclose = null;
+          ws.close();
         }
 
-        function init() {
-          if (ws) {
-            ws.onerror = ws.onopen = ws.onclose = null;
-            ws.close();
+        ws = new WebSocket("ws://localhost:6969");
+        ws.onopen = function () {
+          console.log("Connection Opened");
+        };
+        ws.onmessage = (e) => {
+          // const arr = JSON.parse(e.data).data;
+          const buffer = new Uint8Array(JSON.parse(e.data).data);
+          // membuat DataView dari buffer
+          const dataView = new DataView(buffer.buffer);
+
+          // membaca data dari DataView sebagai string JSON
+          const jsonString = new TextDecoder().decode(dataView);
+
+          // mengurai JSON string menjadi objek JavaScript
+          const json = JSON.parse(jsonString);
+          showMessage(json);
+
+        };
+        ws.onclose = function () {
+          console.log("Connection Closeed");
+          ws = null;
+        };
+      }
+
+      messagesBox.addEventListener("keypress", function (e) {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          if (!ws) {
+            showMessage("No WebSocket Available");
+            return;
           }
-
-          ws = new WebSocket("ws://localhost:6969");
-          ws.onopen = function () {
-            console.log("Connection Opened");
-          };
-          ws.onmessage = (e) => {
-            // const arr = JSON.parse(e.data).data;
-            const buffer = new Uint8Array(JSON.parse(e.data).data);
-            // membuat DataView dari buffer
-            const dataView = new DataView(buffer.buffer);
-
-            // membaca data dari DataView sebagai string JSON
-            const jsonString = new TextDecoder().decode(dataView);
-
-            // mengurai JSON string menjadi objek JavaScript
-            const json = JSON.parse(jsonString);
-            showMessage(json);
-          };
-          ws.onclose = function () {
-            console.log("Connection Closeed");
-            ws = null;
-          };
-        }
-
-        messagesBox.addEventListener("keypress", function (e) {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            if (!ws) {
-              showMessage("No WebSocket Available");
-              return;
-            }
-            ws.send(
-              JSON.stringify({
-                username: username,
-                txt: messagesBox.value,
-              })
-            );
-            showMessage({
+          ws.send(
+            JSON.stringify({
               username: username,
               txt: messagesBox.value,
-            });
+            })
+          );
+          showMessage({
+            username: username,
+            txt: messagesBox.value,
+          });
+        }
+      });
+      messagesBox.addEventListener("keyup", function (e) {
+        if (event.key !== "Enter") {
+          event.preventDefault();
+          if (!ws) {
+            showMessage("No WebSocket Available");
+            return;
           }
-        });
-        messagesBox.addEventListener("keyup", function (e) {
-          if (event.key !== "Enter") {
-            event.preventDefault();
-            if (!ws) {
-              showMessage("No WebSocket Available");
-              return;
-            }
-            ws.send(
-              JSON.stringify({
-                username: username,
-                txt: "sedang mengetik...",
-              })
-            );
-          }
-        });
+          ws.send(
+            JSON.stringify({
+              username: username,
+              txt: "sedang mengetik...",
+            })
+          );
+        }
+      });
 
-        init();
-      })();
-    </script>
-  </body>
+      init();
+    })();
+  </script>
+</body>
+
 </html>
